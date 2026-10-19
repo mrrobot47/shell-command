@@ -91,6 +91,20 @@ class FeatureContext implements Context
 	public $stopped_containers = [];
 
 	/**
+	 * Containers created by a step, removed after the scenario even when it fails.
+	 *
+	 * @var array
+	 */
+	public $created_containers = [];
+
+	/**
+	 * Snapshots of files a scenario changes, as [ path => null (absent) | [ content, mode ] ].
+	 *
+	 * @var array
+	 */
+	public $file_snapshots = [];
+
+	/**
 	 * Initializes context.
 	 */
 	public function __construct()
@@ -409,16 +423,42 @@ class FeatureContext implements Context
 	 */
 	public function cleanupScenario(AfterScenarioScope $scope)
 	{
-		foreach ( array_unique( $this->stopped_containers ) as $container ) {
-			exec( 'docker start ' . escapeshellarg( $container ) . ' 2>&1', $out, $ret );
+		$errors = [];
+		// Containers go first: compose may still need a file that is restored below.
+		foreach ( array_unique( $this->created_containers ) as $container ) {
+			$out = [];
+			exec( 'docker rm -f ' . escapeshellarg( $container ) . ' 2>&1', $out, $ret );
 			if ( 0 !== $ret ) {
-				fwrite( STDERR, "Could not restart container $container: " . implode( "\n", $out ) . "\n" );
+				$errors[] = "Could not remove container $container: " . implode( "\n", $out );
 			}
 		}
+		foreach ( $this->file_snapshots as $path => $snapshot ) {
+			clearstatcache();
+			if ( null === $snapshot ) {
+				if ( file_exists( $path ) && ! unlink( $path ) ) {
+					$errors[] = "Could not remove $path.";
+				}
+			} elseif ( false === file_put_contents( $path, $snapshot[0] ) || ! chmod( $path, $snapshot[1] ) ) {
+				$errors[] = "Could not restore $path.";
+			}
+		}
+		foreach ( array_unique( $this->stopped_containers ) as $container ) {
+			$out = [];
+			exec( 'docker start ' . escapeshellarg( $container ) . ' 2>&1', $out, $ret );
+			if ( 0 !== $ret ) {
+				$errors[] = "Could not restart container $container: " . implode( "\n", $out );
+			}
+		}
+		$this->created_containers = [];
+		$this->file_snapshots     = [];
 		$this->stopped_containers = [];
 		$this->commands           = [];
 		$this->cwd                = null;
 		chdir($this->ee_path);
+
+		if ( $errors ) {
+			throw new Exception( "Scenario cleanup failed, restore by hand:\n" . implode( "\n", $errors ) );
+		}
 	}
 
 	/**
@@ -432,7 +472,7 @@ class FeatureContext implements Context
 		$result = EE::launch( "docker ps -qf label=$label_string | wc -l", false, true );
 		$running_containers = (int) trim($result->stdout);
 
-		if($expected_running_containers === $running_containers) {
+		if ( (int) $expected_running_containers !== $running_containers ) {
 			throw new Exception("Expected $expected_running_containers running containers. Found: $running_containers");
 		}
 	}
@@ -444,9 +484,13 @@ class FeatureContext implements Context
 	 */
 	public static function cleanup(AfterFeatureScope $scope)
 	{
+		$failed = [];
 		foreach ( self::listSites() as $site => $status ) {
 			if ( 0 === strpos( $site, self::SITE_PREFIX ) ) {
-				exec( 'sudo bin/ee site delete ' . escapeshellarg( $site ) . ' --yes' );
+				exec( 'sudo bin/ee site delete ' . escapeshellarg( $site ) . ' --yes 2>&1', $out, $ret );
+				if ( 0 !== $ret ) {
+					$failed[] = $site;
+				}
 			}
 		}
 
@@ -455,6 +499,9 @@ class FeatureContext implements Context
 		}
 		if(file_exists('ee-old.phar')) {
 			unlink('ee-old.phar');
+		}
+		if ( $failed ) {
+			throw new Exception( 'Could not delete: ' . implode( ', ', $failed ) );
 		}
 	}
 
@@ -473,9 +520,13 @@ class FeatureContext implements Context
 	public static function listSites()
 	{
 		$result = EE::launch( 'sudo bin/ee site list --format=json', false, true );
-		$sites  = json_decode( trim( $result->stdout ), true );
-		if ( ! is_array( $sites ) ) {
+		if ( 0 !== $result->return_code && false !== strpos( $result->stderr, 'No sites found!' ) ) {
 			return [];
+		}
+		$sites = json_decode( trim( $result->stdout ), true );
+		// A broken list must not look like "no sites" (vacuous "should not exist", silent cleanup).
+		if ( 0 !== $result->return_code || ! is_array( $sites ) ) {
+			throw new Exception( "Could not list sites.\n" . self::describeRun( $result ) );
 		}
 
 		$list = [];
@@ -725,9 +776,31 @@ class FeatureContext implements Context
 	}
 
 	/**
-	 * @Given the file :path does not exist
+	 * Snapshots the file (or its absence) now; @AfterScenario puts it back, even when a step fails.
+	 *
+	 * @Given the file :path is restored after the scenario
 	 */
-	public function theFileDoesNotExist( $path )
+	public function theFileIsRestoredAfterTheScenario( $path )
+	{
+		if ( array_key_exists( $path, $this->file_snapshots ) ) {
+			return;
+		}
+		clearstatcache();
+		if ( ! file_exists( $path ) ) {
+			$this->file_snapshots[ $path ] = null;
+			return;
+		}
+		$content = file_get_contents( $path );
+		if ( false === $content ) {
+			throw new Exception( "Could not read $path." );
+		}
+		$this->file_snapshots[ $path ] = [ $content, fileperms( $path ) & 07777 ];
+	}
+
+	/**
+	 * @Given the file :path is removed
+	 */
+	public function theFileIsRemoved( $path )
 	{
 		if ( file_exists( $path ) && ! unlink( $path ) ) {
 			throw new Exception( "Could not remove $path." );
@@ -825,8 +898,9 @@ class FeatureContext implements Context
 
 	private function stopContainer( $name )
 	{
-		$this->mustRun( 'docker stop ' . escapeshellarg( $name ) );
+		// Registered first, so a stop that fails halfway is still undone.
 		$this->stopped_containers[] = $name;
+		$this->mustRun( 'docker stop ' . escapeshellarg( $name ) );
 	}
 
 	/**
@@ -867,6 +941,28 @@ class FeatureContext implements Context
 	public function theServiceOfSiteIsStopped( $service, $site )
 	{
 		$this->stopContainer( $this->siteServiceContainer( $site, $service ) );
+	}
+
+	/**
+	 * Creates and starts a compose service of a site (including docker-compose-custom.yml, like ee);
+	 * its container is removed after the scenario.
+	 *
+	 * @Given the service :service of site :site is up
+	 */
+	public function theServiceOfSiteIsUp( $service, $site )
+	{
+		$dir     = EE_SITE_ROOT . '/' . $site;
+		$compose = 'docker-compose -f docker-compose.yml' . ( file_exists( "$dir/docker-compose-custom.yml" ) ? ' -f docker-compose-custom.yml' : '' );
+		$cd      = 'cd ' . escapeshellarg( $dir ) . ' && ';
+		$up      = EE::launch( $cd . $compose . ' up -d ' . escapeshellarg( $service ), false, true );
+		// Register whatever was created, even when `up` failed after creating the container.
+		$ps = EE::launch( $cd . $compose . ' ps -aq ' . escapeshellarg( $service ), false, true );
+		foreach ( array_filter( explode( "\n", trim( $ps->stdout ) ) ) as $id ) {
+			$this->created_containers[] = $id;
+		}
+		if ( 0 !== $up->return_code ) {
+			throw new Exception( "Could not start $service.\n" . self::describeRun( $up ) );
+		}
 	}
 
 	/**

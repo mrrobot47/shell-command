@@ -262,7 +262,8 @@ Feature: ee shell --command on a php site
       """
 
   Scenario: A service from docker-compose-custom.yml gets a shell, and --custom-compose overrides it
-    Given the file '/opt/easyengine/sites/bh-shell-command-2.test/docker-compose-custom.yml' contains:
+    Given the file '/opt/easyengine/sites/bh-shell-command-2.test/docker-compose-custom.yml' is restored after the scenario
+    And the file '/opt/easyengine/sites/bh-shell-command-2.test/docker-compose-custom.yml' contains:
       """
       services:
         bh-extra:
@@ -270,8 +271,7 @@ Feature: ee shell --command on a php site
           networks:
             - bh-shell-command-2.test
       """
-    When I run 'cd /opt/easyengine/sites/bh-shell-command-2.test && docker-compose -f docker-compose.yml -f docker-compose-custom.yml up -d bh-extra'
-    Then the return code should be 0
+    And the service 'bh-extra' of site 'bh-shell-command-2.test' is up
     When I run 'bin/ee shell bh-shell-command-2.test --service=bh-extra --command="redis-cli ping"'
     Then the return code should be 0
     And STDOUT should be:
@@ -288,6 +288,3 @@ Feature: ee shell --command on a php site
       """
       Error: bh-shell-command-2.test site does not have support to launch bh-extra shell.
       """
-    When I run 'cd /opt/easyengine/sites/bh-shell-command-2.test && docker-compose -f docker-compose.yml -f docker-compose-custom.yml rm -sf bh-extra'
-    Then the return code should be 0
-    Given the file '/opt/easyengine/sites/bh-shell-command-2.test/docker-compose-custom.yml' does not exist

@@ -69,15 +69,15 @@ Feature: ee shell on a WordPress site
       bh-shell-command-4.test
       """
 
-  Scenario: The mailhog shell uses sh (the image has no bash) once mailhog is enabled
+  # The container is started directly: `ee mailhog enable` would also create the global admin-tools auth, which is global state.
+  Scenario: The mailhog shell uses sh (the image has no bash) once the mailhog container runs
     When I run 'bin/ee shell bh-shell-command-4.test --service=mailhog --command=true'
     Then the return code should be 1
     And STDERR should contain:
       """
       is not running
       """
-    When I run 'bin/ee mailhog enable bh-shell-command-4.test'
-    Then the return code should be 0
+    Given the service 'mailhog' of site 'bh-shell-command-4.test' is up
     When I run 'bin/ee shell bh-shell-command-4.test --service=mailhog --command="echo from-sh; id -un"'
     Then the return code should be 0
     And STDOUT should be:
@@ -91,5 +91,3 @@ Feature: ee shell on a WordPress site
       """
       interactive-sh
       """
-    When I run 'bin/ee mailhog disable bh-shell-command-4.test'
-    Then the return code should be 0

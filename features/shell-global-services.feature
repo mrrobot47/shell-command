@@ -1,6 +1,10 @@
 Feature: ee shell on global services
   --service=global-nginx-proxy|global-db|global-redis opens a shell in the global container and ignores the site argument.
 
+  Background:
+    # global-redis and global-db only exist once a site uses them; this site makes the feature work on a fresh stack.
+    Given the php site 'bh-shell-command-5.test' exists with flags '--with-db --cache'
+
   Scenario: global-redis shell
     When I run 'bin/ee shell --service=global-redis --command="redis-cli ping"'
     Then the return code should be 0
@@ -53,7 +57,7 @@ Feature: ee shell on global services
       root
       """
 
-  # SHELL-1 (proposed): --user is double-wrapped (--user='--user=<user>') in command mode.
+  # SHELL-1 (expected to fail until fixed): --user is double-wrapped (--user='--user=<user>') in command mode.
   @known-bug
   Scenario: --user on a global service in command mode
     When I run 'bin/ee shell --service=global-redis --user=redis --command=whoami'
@@ -63,7 +67,7 @@ Feature: ee shell on global services
       redis
       """
 
-  # SHELL-9 (proposed): the user check swallows piped STDIN before the interactive shell starts.
+  # SHELL-9 (expected to fail until fixed): the user check swallows piped STDIN before the interactive shell starts.
   @known-bug
   Scenario: --user on a global service in interactive mode
     When I run 'printf "whoami\n" | bin/ee shell --service=global-redis --user=redis'
@@ -75,8 +79,9 @@ Feature: ee shell on global services
 
   @destructive
   Scenario: The global-db shell creates my.cnf for password-less mysql
-    Given the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' does not exist
-    When I run 'bin/ee shell --service=global-db --command="mysql -Nse 'SELECT 42'"'
+    Given the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' is restored after the scenario
+    And the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' is removed
+    When I run 'bin/ee shell --service=global-db --command="mariadb -Nse 'SELECT 42'"'
     Then the return code should be 0
     And STDOUT should be:
       """
@@ -91,11 +96,12 @@ Feature: ee shell on global services
 
   @destructive
   Scenario: An existing my.cnf is not overwritten
-    Given the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' does not exist
+    Given the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' is restored after the scenario
+    And the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' is removed
     When I run 'bin/ee shell --service=global-db --command=true'
     Then the return code should be 0
     Given the line '# bh-shell-command marker' is appended to the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf'
-    When I run 'bin/ee shell --service=global-db --command="mysql -Nse 'SELECT 1'"'
+    When I run 'bin/ee shell --service=global-db --command="mariadb -Nse 'SELECT 1'"'
     Then the return code should be 0
     And STDOUT should be:
       """
@@ -105,12 +111,12 @@ Feature: ee shell on global services
       """
       # bh-shell-command marker
       """
-    Given the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' does not exist
 
   @destructive
   Scenario: Interactive global-db shell uses the generated my.cnf
-    Given the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' does not exist
-    When I run 'echo "mysql -Nse 'SELECT 7'" | bin/ee shell --service=global-db'
+    Given the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' is restored after the scenario
+    And the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' is removed
+    When I run 'echo "mariadb -Nse 'SELECT 7'" | bin/ee shell --service=global-db'
     Then the return code should be 0
     And STDOUT should be:
       """
@@ -118,10 +124,11 @@ Feature: ee shell on global services
       """
     And the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' should exist
 
-  # SHELL-8 (proposed): the global db root password is written with the default 0644 mode.
+  # SHELL-8 (expected to fail until fixed): the global db root password is written with the default 0644 mode.
   @known-bug @destructive
   Scenario: The generated my.cnf is only readable by root
-    Given the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' does not exist
+    Given the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' is restored after the scenario
+    And the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' is removed
     When I run 'bin/ee shell --service=global-db --command=true'
     Then the return code should be 0
     And the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' should have permissions 600
