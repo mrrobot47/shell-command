@@ -22,25 +22,25 @@ Suite for `ee shell` (package `easyengine/shell-command`, `src/Shell_Command.php
 | 12 | html site: `php` → `nginx` | default and explicit `--service=php` mapped to nginx | html: "The default service of an html site is nginx", "An explicit --service=php…" |
 | 13 | `--service=<site service>` | `docker-compose config --services` check | html (nginx), php-command (nginx, postfix, db with `--local-db`), interactive (postfix), wp (nginx, postfix, mailhog) |
 | 14 | unsupported service | "X site does not have support to launch Y shell." | html outline (db, redis, mailhog, postfix, global-cron), php-command (redis), interactive (db), wp (db on global db) |
-| 15 | service in compose but not started | exec fails "is not running" | php-command: "A service that exists but is not started…", wp: mailhog scenario, html: stopped nginx (both modes) |
+| 15 | service in compose but not started | exec fails "is not running" | php-command: "A service that exists but is not started…", wp: mailhog scenario (container started directly, not via `ee mailhog enable`, which creates the global admin-tools auth), html: stopped nginx (both modes) |
 | 16 | services from `docker-compose-custom.yml` | included by `docker_compose_with_custom()` in the check and the exec | php-command: "A service from docker-compose-custom.yml…" |
 | 17 | `--custom-compose=<missing>` | warning, falls back to `docker-compose.yml` only | php-command: same scenario |
 | 18 | `--service` without value | warning, service unset, empty-service error | html: "--service without a value…" |
-| 19 | `global-nginx-proxy` / `global-redis` / `global-db` | global branch, `chdir(EE_SERVICE_DIR)` | global: redis, nginx-proxy, global-db scenarios |
+| 19 | `global-nginx-proxy` / `global-redis` / `global-db` | global branch, `chdir(EE_SERVICE_DIR)` | global: redis, nginx-proxy, global-db scenarios (the Background creates `bh-shell-command-5.test` with `--with-db --cache` so global-db and global-redis exist on a fresh stack) |
 | 20 | global service ignores `<site-name>` | no site lookup at all | global: "The site argument is ignored…" |
 | 21 | `global-cron` is not a global target | falls into the site branch | validation: "global-cron is not a global shell target…", html outline |
 | 22 | stopped global container | "global-redis service container is not running." (both modes) | global: "A stopped global service is reported…" `@destructive` |
-| 23 | global-db `my.cnf` | written once from `Option::get(GLOBAL_DB)`, enables password-less `mysql` (both modes), not overwritten | global: "…creates my.cnf…", "An existing my.cnf is not overwritten", "Interactive global-db shell…" (all `@destructive`) |
+| 23 | global-db `my.cnf` | written once from `Option::get(GLOBAL_DB)`, enables password-less `mariadb` (both modes; the global-db root has no unix_socket auth, checked in a throwaway container, so the query really proves the file), not overwritten | global: "…creates my.cnf…", "An existing my.cnf is not overwritten", "Interactive global-db shell…" (all `@destructive`) |
 | 24 | global-db `my.cnf` mode | root password written 0644 | global: "The generated my.cnf is only readable by root" `@known-bug` `@destructive` SHELL-8 |
 | 25 | shell binary | `sh` for mailhog (no bash in image), `bash` otherwise | wp: mailhog scenario (command and interactive) |
 | 26 | `--command` output | STDOUT replayed, STDERR via `error_log()` | php-command: "STDOUT of the command is printed", "STDERR is kept separate…", "Multi-line output…" |
-| 27 | `--command` exit status | any failure → exit 1 (#25) | php-command: outline (true/false/exit 2/exit 255), "An unknown binary…", global: "A failing command…", wp: failing WP-CLI |
-| 28 | `--command` exact status | collapsed to 1 | php-command: "The exact exit status…" `@known-bug` SHELL-2 |
-| 29 | `--command` quoting | wrapped as `bash -c "<cmd>"` by the host shell | php-command: shell syntax outline (works), "Double quotes…" and "Variables…" `@known-bug` SHELL-4 |
+| 27 | `--command` exit status | any failure → exit 1 (#25) | php-command: outline (true/false/exit 1), "An unknown binary…", "STDERR is kept separate…" and global "A failing command…" (non-zero only, so a SHELL-2 fix doesn't break them), wp: failing WP-CLI |
+| 28 | `--command` exact status | collapsed to 1 | php-command: "The exact exit status…" (3, 255) `@known-bug` SHELL-2 |
+| 29 | `--command` quoting | wrapped as `bash -c "<cmd>"` by the host shell | php-command: shell syntax outline (works), "Double quotes…", "Variables…" and "Command substitution runs inside the container" `@known-bug` SHELL-4 |
 | 30 | `--command` STDIN | forwarded (`exec -i`) | php-command: "STDIN is forwarded to the command" (with/without `--skip-tty`) |
 | 31 | `--command` TTY | output captured, never a TTY, even from a terminal | php-command: "Command mode never allocates a TTY…", "…even when ee runs in a terminal" |
-| 32 | `--command` without value / empty | warning then interactive / silently interactive | php-command: "--command without a value…", "An empty --command is rejected" `@known-bug` SHELL-5 |
-| 33 | `--skip-tty` | adds `-T` in `docker_compose_exec()` only | validation (accepted), php-command outline, "--skip-tty does not hide a failure", interactive: "--skip-tty keeps working with piped input" |
+| 32 | `--command` without value / empty / `0` | warning then interactive / silently interactive | php-command: "--command without a value warns" (only the warning is pinned; the interactive fallback is part of SHELL-5), "An empty or falsy --command…" (`""`, `0`) `@known-bug` SHELL-5 |
+| 33 | `--skip-tty` | adds `-T` in `docker_compose_exec()` only | accepted and harmless only: validation, php-command outline, "--skip-tty does not hide a failure", interactive "--skip-tty keeps working with piped input". Whether `-T` is really added isn't observable, because docker-compose v2 disables the TTY whenever its stdout is a pipe (always the case under `EE::exec`) |
 | 34 | `--skip-tty` in interactive mode | ignored (no `-T`) | interactive: "From a terminal with STDIN redirected…" (control), "--skip-tty makes the interactive shell work…" `@known-bug` SHELL-6 |
 | 35 | interactive mode | `proc_open` with ee's own fds, status via `proc_close()` | interactive: piped commands, EOF, exit status outline (0/3/42/255), last command status, 127, STDOUT/STDERR separation, session state |
 | 36 | interactive TTY | allocated when ee runs in a terminal | interactive: "From a terminal the shell gets a TTY…" |
@@ -49,13 +49,14 @@ Suite for `ee shell` (package `easyengine/shell-command`, `src/Shell_Command.php
 | 39 | `--user` unknown | warning, falls back to the default user | php-command, interactive, global ("…falls back…") |
 | 40 | `--user` without value | warning, default user | php-command: "--user without a value…" |
 | 41 | WordPress sites | WP-CLI as www-data (no `--allow-root`), DB access, global db wiring | wp: core version, siteurl, DB_HOST, failing WP-CLI, interactive WP-CLI |
-| 42 | idempotency | repeated runs give the same result; `my.cnf` kept | html: "Running the same command twice…", global: "An existing my.cnf is not overwritten" |
+| 42 | idempotency | repeated runs give the same result; `my.cnf` kept | html: "Running the same command twice…" (weak: `ee shell` itself has no side effects), global: "An existing my.cnf is not overwritten" |
 | 43 | `check_proc_available('ee_shell')` | errors when `proc_open` is disabled | not covered: needs a php.ini with `disable_functions`, which the suite can't set for `bin/ee` without changing the host PHP config |
 | 44 | `proc_open()` failure → exit 1 | defensive branch | not covered: can't be triggered from outside |
 | 45 | "Docker is not installed" in `container_status()` | core helper | not covered: would need Docker removed from PATH on the live stack |
 | 46 | `delem_log()` start/end | debug log lines | not covered: logging only |
+| 47 | `--skip-tty=false` (CORE-2) | the string `'false'` still adds `-T` | not covered: not observable through `ee shell`, docker-compose v2 already disables the TTY when its stdout is a pipe (always the case under `EE::exec`) |
 
-Coverage estimate: 42 of 46 inventory items (about 91%); the uncovered ones are defensive or environment-level branches. Every branch of `Shell_Command::__invoke()`, `check_shell_available()` and `check_user_available()` is exercised; only the two failure branches of `run()` aren't.
+Coverage estimate: 42 of 47 inventory items (about 89%); the uncovered ones are defensive or environment-level branches. Every branch of `Shell_Command::__invoke()`, `check_shell_available()` and `check_user_available()` is exercised; only the two failure branches of `run()` aren't.
 
 ## Features
 
@@ -63,15 +64,17 @@ Coverage estimate: 42 of 46 inventory items (about 91%); the uncovered ones are 
 |---|---|---|
 | `shell-validation.feature` | none | 12 |
 | `shell-html.feature` | `bh-shell-command-1.test` (html) | 21 |
-| `shell-php-command.feature` | `bh-shell-command-2.test` (php, `--with-db --local-db`) | 37 |
+| `shell-php-command.feature` | `bh-shell-command-2.test` (php 8.4, `--with-db --local-db`) | 39 |
 | `shell-php-interactive.feature` | `bh-shell-command-3.test` (php) | 19 |
 | `shell-wp.feature` | `bh-shell-command-4.test` (wp, global db) | 9 |
-| `shell-global-services.feature` | none | 13 |
-| **Total** | 4 sites | **111** |
+| `shell-global-services.feature` | `bh-shell-command-5.test` (php, `--with-db --cache`) | 13 |
+| **Total** | 5 sites | **113** |
 
-Tags: `@known-bug` 14, `@destructive` 5, `@le` 0, `@remote` 0 (nothing in `ee shell` needs public DNS or backups).
+Tags: `@known-bug` 17, `@destructive` 5, `@le` 0, `@remote` 0 (nothing in `ee shell` needs public DNS or backups).
 
-## Known bugs exposed (proposed IDs, not yet in issues.md)
+## Known bugs exposed (issues.md `SHELL-1`…`SHELL-9`, core `CORE-2`)
+
+`@known-bug` scenarios assert the fixed behaviour, so they fail until the bug is fixed.
 
 - **SHELL-1** (Medium): in `--command` mode a valid `--user` is turned into `--user=<u>` and then quoted again by `docker_compose_exec()`, producing `--user='--user=<u>'`, so docker fails with "unable to find user --user=root". Every `ee shell --user=<existing user> --command=…` fails. Reproduced with the same compose invocation in a throwaway project.
 - **SHELL-2** (Low): `--command` collapses every failure to exit 1, while the interactive mode propagates the real status.
@@ -80,15 +83,14 @@ Tags: `@known-bug` 14, `@destructive` 5, `@le` 0, `@remote` 0 (nothing in `ee sh
 - **SHELL-5** (Low): `--command=` (empty) silently opens the interactive shell and reads STDIN; `--command` without a value does the same with only a warning.
 - **SHELL-6** (Low): the interactive path builds its own `exec` without `-T`, so `--skip-tty` is ignored; from a terminal with redirected STDIN docker fails with "the input device is not a TTY".
 - **SHELL-7** (Cosmetic): help prints ` ## EXAMPLES`; the README lists `[--skip-tty]` as a command option (it's a global parameter); the "Could not find the site…" message has double spaces (`ee shell  <site-name>`).
-- **SHELL-8** (Low): the global-db `my.cnf` with the DB root password is written with mode 0644 (its volume dir is 0711, so any local user can read it by path).
+- **SHELL-8** (Low): the global-db `my.cnf` with the DB root password is written with mode 0644. Defence in depth: on current Docker `/var/lib/docker` is 0710 root:root, so other local users can't reach it by path.
 - **SHELL-9** (Medium): `check_user_available()` runs `docker-compose exec` with STDIN attached, which swallows piped input: `ee shell <site> --user=root < script.sh` runs nothing. Reproduced in a throwaway compose project.
 
 ## Running
 
 - The site steps are idempotent (`Given the <type> site '<name>' exists` creates the site once per feature and re-enables it if a scenario disabled it), so scenarios in a feature are independent. `@AfterFeature` deletes only `bh-shell-command-*` sites; `@AfterScenario` restarts any container a step stopped.
-- STDIN is never inherited from Behat's pty: interactive scenarios pipe input or use `< /dev/null`, and TTY cases use `script -qec … /dev/null`.
-- `@destructive` scenarios stop and restart `services_global-redis_1` and delete/regenerate `/opt/easyengine/services/mariadb/conf/conf.d/my.cnf` (ee recreates it with the same content on the next global-db shell; the "not overwritten" scenario removes it again at the end).
-- The custom compose scenario uses the local `easyengine/redis:v4.11.0` image; update the tag when `img-versions.json` moves.
-- `bin/ee mailhog enable` in `shell-wp.feature` initialises the global admin-tools auth if it doesn't exist yet.
-- Estimated runtime: about 3 minutes of site creation (html ~15s, php ~25s, php with local db ~40s, wp ~60s), about 5 to 6 minutes for 111 scenarios (each `ee shell` call is 1 to 3s plus the site-list check in the Background), about 1 minute of site deletion: roughly 10 minutes in total. Excluding `@known-bug` and `@destructive`: `--tags='~@known-bug&&~@destructive'`.
+- Interactive scenarios pipe input or use `< /dev/null`, and TTY cases run `script -qec … /dev/null` with piped input or `< /dev/null`, so none depends on Behat's own terminal. Plain `--command` runs still inherit Behat's STDIN (harmless: the commands don't read it). Help is run with `COLUMNS=200` so the synopsis doesn't wrap on a narrow terminal.
+- `@destructive` scenarios stop `services_global-redis_1` and delete/regenerate `/opt/easyengine/services/mariadb/conf/conf.d/my.cnf`. `@AfterScenario` undoes both even when a step fails: `Given the file … is restored after the scenario` snapshots my.cnf (content and mode, or its absence) and puts it back, and stopped containers are restarted; a failed restore fails the hook with what to fix by hand. Only a killed Behat process skips the hooks.
+- The custom compose scenario uses the local `easyengine/redis:v4.11.0` image; update the tag when `img-versions.json` moves. Its `docker-compose-custom.yml` is restored and the `bh-extra` container removed after the scenario (`Given the service … of site … is up` registers what it creates).
+- Estimated runtime: about 3.5 minutes of site creation (html ~15s, php ~25s twice, php with local db ~40s, wp ~60s), about 5 to 6 minutes for 113 scenarios (each `ee shell` call is 1 to 3s plus the site-list check in the Background), about 1 minute of site deletion: roughly 10 minutes in total. Excluding `@known-bug` and `@destructive`: `--tags='~@known-bug&&~@destructive'`.
 - Validation done: `vendor/bin/behat --dry-run --strict` has no undefined or ambiguous steps (it exits 1 in dry-run because all steps are skipped, same as core's own suite), and `php -l` of `features/bootstrap/*.php` passes on php:7.4-cli and php:8.5-cli.
