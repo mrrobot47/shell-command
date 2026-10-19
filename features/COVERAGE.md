@@ -56,7 +56,7 @@ Suite for `ee shell` (package `easyengine/shell-command`, `src/Shell_Command.php
 | 46 | `delem_log()` start/end | debug log lines | not covered: logging only |
 | 47 | `--skip-tty=false` (CORE-2) | the string `'false'` still adds `-T` | not covered: not observable through `ee shell`, docker-compose v2 already disables the TTY when its stdout is a pipe (always the case under `EE::exec`) |
 
-Coverage estimate: 42 of 47 inventory items (about 89%); the uncovered ones are defensive or environment-level branches. Every branch of `Shell_Command::__invoke()`, `check_shell_available()` and `check_user_available()` is exercised; only the two failure branches of `run()` aren't.
+Coverage estimate: 36 of 47 inventory items (about 77%). Items 2, 8, 24, 28, 37 and 38 wait for the held-back known-bug scenarios; items 43–47 are defensive or environment-level branches. `check_shell_available()` and `Shell_Command::__invoke()` are exercised except the valid-`--user` path, which comes back with the SHELL-1 and SHELL-9 scenarios; `check_user_available()` is reached only with an unknown user, and the two failure branches of `run()` aren't reached.
 
 ## Features
 

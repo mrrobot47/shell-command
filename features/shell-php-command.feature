@@ -50,9 +50,10 @@ Feature: ee shell --command on a php site
       | false    | 1    |
       | exit 1   | 1    |
 
+  # Non-zero only: bash exits 127, which SHELL-2 collapses to 1.
   Scenario: An unknown binary fails with the shell's error
     When I run 'bin/ee shell bh-shell-command-2.test --command=bh-no-such-binary'
-    Then the return code should be 1
+    Then the return code should not be 0
     And STDERR should contain:
       """
       bh-no-such-binary: command not found
