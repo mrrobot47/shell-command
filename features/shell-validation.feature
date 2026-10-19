@@ -1,8 +1,9 @@
 Feature: ee shell argument validation
   Validation paths of `ee shell` that need no site of this suite. Unknown sites never reach Docker.
 
+  # A wide COLUMNS keeps the synopsis on one line whatever terminal Behat runs in.
   Scenario: The command is registered and documents its options
-    When I run 'bin/ee help shell'
+    When I run 'COLUMNS=200 bin/ee help shell < /dev/null'
     Then the return code should be 0
     And STDOUT should contain:
       """
@@ -24,8 +25,12 @@ Feature: ee shell argument validation
   # SHELL-7 (expected to fail until fixed): the docblock indents "## EXAMPLES" by one extra space, so help prints the raw markdown heading.
   @known-bug
   Scenario: Help renders the EXAMPLES heading
-    When I run 'bin/ee help shell'
+    When I run 'COLUMNS=200 bin/ee help shell < /dev/null'
     Then the return code should be 0
+    And STDOUT should contain:
+      """
+      # Open shell for site
+      """
     And STDOUT should not contain:
       """
       ## EXAMPLES

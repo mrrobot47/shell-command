@@ -2,7 +2,7 @@ Feature: ee shell --command on a php site
   Non-interactive mode: the command runs through `bash -c` in the service container, output is captured and replayed.
 
   Background:
-    Given the php site 'bh-shell-command-2.test' exists with flags '--with-db --local-db'
+    Given the php site 'bh-shell-command-2.test' exists with flags '--with-db --local-db --php=8.4'
 
   Scenario: STDOUT of the command is printed
     When I run 'bin/ee shell bh-shell-command-2.test --command="echo hello-from-php"'
@@ -27,9 +27,9 @@ Feature: ee shell --command on a php site
     Then the return code should be 0
     And STDOUT should match '/^PHP 8\.4\./m'
 
-  Scenario: STDERR is kept separate and a failing command exits 1
+  Scenario: STDERR is kept separate and a failing command fails ee
     When I run 'bin/ee shell bh-shell-command-2.test --command="echo out; echo err >&2; exit 3"'
-    Then the return code should be 1
+    Then the return code should not be 0
     And STDOUT should be:
       """
       out
@@ -39,6 +39,7 @@ Feature: ee shell --command on a php site
       err
       """
 
+  # Only statuses that hold with and without the SHELL-2 fix; the exact-status cases are the @known-bug scenario below.
   Scenario Outline: Exit status of the command
     When I run 'bin/ee shell bh-shell-command-2.test --command="<command>"'
     Then the return code should be <code>
@@ -47,14 +48,18 @@ Feature: ee shell --command on a php site
       | command  | code |
       | true     | 0    |
       | false    | 1    |
-      | exit 2   | 1    |
-      | exit 255 | 1    |
+      | exit 1   | 1    |
 
   # SHELL-2 (expected to fail until fixed): --command collapses every failure to exit 1 (#25), while the interactive mode propagates the real status.
   @known-bug
-  Scenario: The exact exit status of the command is propagated
-    When I run 'bin/ee shell bh-shell-command-2.test --command="exit 3"'
-    Then the return code should be 3
+  Scenario Outline: The exact exit status of the command is propagated
+    When I run 'bin/ee shell bh-shell-command-2.test --command="exit <code>"'
+    Then the return code should be <code>
+
+    Examples:
+      | code |
+      | 3    |
+      | 255  |
 
   Scenario: An unknown binary fails with the shell's error
     When I run 'bin/ee shell bh-shell-command-2.test --command=bh-no-such-binary'
@@ -148,14 +153,17 @@ Feature: ee shell --command on a php site
     When I run 'bin/ee shell bh-shell-command-2.test --skip-tty --command=false'
     Then the return code should be 1
 
+  # docker-compose v2 disables the TTY whenever its stdout is a pipe, so this can't tell whether --skip-tty added -T.
   Scenario: Command mode never allocates a TTY, with or without --skip-tty
     When I run 'bin/ee shell bh-shell-command-2.test --command="[ -t 1 ] && echo tty || echo notty"'
-    Then STDOUT should be:
+    Then the return code should be 0
+    And STDOUT should be:
       """
       notty
       """
     When I run 'bin/ee shell bh-shell-command-2.test --skip-tty --command="[ -t 1 ] && echo tty || echo notty"'
-    Then STDOUT should be:
+    Then the return code should be 0
+    And STDOUT should be:
       """
       notty
       """
@@ -168,16 +176,12 @@ Feature: ee shell --command on a php site
       not a tty
       """
 
-  Scenario: --command without a value warns and falls back to the interactive shell
-    When I run 'printf "echo fell-back\n" | bin/ee shell bh-shell-command-2.test --command'
-    Then the return code should be 0
-    And STDERR should contain:
+  # Today it then falls back to the interactive shell (part of SHELL-5), so only the warning is pinned here.
+  Scenario: --command without a value warns
+    When I run 'bin/ee shell bh-shell-command-2.test --command < /dev/null'
+    Then STDERR should contain:
       """
       Warning: --command parameter needs a value
-      """
-    And STDOUT should be:
-      """
-      fell-back
       """
 
   # SHELL-5 (expected to fail until fixed): an empty (or "0") --command silently opens the interactive shell, so `--command="$CMD"` with an empty CMD reads stdin instead of failing.
@@ -246,12 +250,13 @@ Feature: ee shell --command on a php site
       bh-shell-command-2.test
       """
 
+  # The php image also ships a mariadb client, so check for the server's datadir instead.
   Scenario: The local db service shell runs in the site's mariadb container
-    When I run 'bin/ee shell bh-shell-command-2.test --service=db --command="mariadb --version"'
+    When I run 'bin/ee shell bh-shell-command-2.test --service=db --command="test -d /var/lib/mysql/mysql && echo has-datadir"'
     Then the return code should be 0
-    And STDOUT should contain:
+    And STDOUT should be:
       """
-      MariaDB
+      has-datadir
       """
 
   Scenario: A service that exists but is not started fails at exec time

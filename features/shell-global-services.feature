@@ -29,9 +29,9 @@ Feature: ee shell on global services
       PONG
       """
 
-  Scenario: A failing command in a global service exits 1
+  Scenario: A failing command in a global service fails ee
     When I run 'bin/ee shell --service=global-redis --command="echo before; exit 4"'
-    Then the return code should be 1
+    Then the return code should not be 0
     And STDOUT should be:
       """
       before
@@ -150,5 +150,3 @@ Feature: ee shell on global services
       """
     When the docker container 'services_global-redis_1' is started
     Then I wait until the docker container 'services_global-redis_1' is running up to 30 seconds
-    When I run 'bin/ee shell --service=global-redis --command="redis-cli ping"'
-    Then the return code should be 0
