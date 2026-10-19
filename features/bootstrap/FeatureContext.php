@@ -22,7 +22,10 @@ if ( 'Darwin' === php_uname( 's' ) ) {
 		$root_alias = '/Users/' . $sys_name;
 	}
 }
-define( 'EE_ROOT_DIR', $root_alias . '/easyengine' );
+// Core's init-ee.php may already define it (a redefinition warns and is an error in PHP 9).
+if ( ! defined( 'EE_ROOT_DIR' ) ) {
+	define( 'EE_ROOT_DIR', $root_alias . '/easyengine' );
+}
 
 require_once EE_ROOT . '/php/bootstrap.php';
 
@@ -600,6 +603,16 @@ class FeatureContext implements Context
 	}
 
 	/**
+	 * @Then the site :site should not exist
+	 */
+	public function theSiteShouldNotExist( $site )
+	{
+		if ( array_key_exists( $site, self::listSites() ) ) {
+			throw new Exception( "Site $site is in `ee site list`." );
+		}
+	}
+
+	/**
 	 * @Then the site :site should be :status
 	 */
 	public function theSiteShouldBe( $site, $status )
@@ -694,6 +707,20 @@ class FeatureContext implements Context
 	{
 		if ( ! preg_match( $regex, $this->streamOf( $stream ) ) ) {
 			throw new Exception( "Expected $stream to match $regex.\n" . self::describeRun( $this->lastCommand() ) );
+		}
+	}
+
+	/**
+	 * @Then the outputs of the last two commands should be identical
+	 */
+	public function theOutputsOfTheLastTwoCommandsShouldBeIdentical()
+	{
+		if ( count( $this->commands ) < 2 ) {
+			throw new Exception( 'Fewer than two commands have been run.' );
+		}
+		list( $a, $b ) = array_slice( $this->commands, -2 );
+		if ( $a->return_code !== $b->return_code || $a->stdout !== $b->stdout ) {
+			throw new Exception( "Outputs differ.\n" . self::describeRun( $a ) . "\n\n" . self::describeRun( $b ) );
 		}
 	}
 
