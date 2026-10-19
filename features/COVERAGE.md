@@ -46,7 +46,7 @@ Suite for `ee shell` (package `easyengine/shell-command`, `src/Shell_Command.php
 | 36 | interactive TTY | allocated when ee runs in a terminal | interactive: "From a terminal the shell gets a TTY…" |
 | 37 | `--user` valid, command mode | `--user='--user=<u>'` double wrap | php-command outline (root, www-data), global: "--user on a global service in command mode" `@known-bug` SHELL-1 |
 | 38 | `--user` valid, interactive | works, but the user check swallows piped STDIN | interactive outline (root, www-data), global: "--user on a global service in interactive mode" `@known-bug` SHELL-9 |
-| 39 | `--user` unknown | warning, falls back to the default user | php-command, interactive, global ("…falls back…") |
+| 39 | `--user` unknown | warning, falls back to the default user | php-command, interactive, global ("…falls back…"); the interactive fallback's piped input: "The fallback shell of an unknown --user…" `@known-bug` SHELL-9 (Docker-version dependent) |
 | 40 | `--user` without value | warning, default user | php-command: "--user without a value…" |
 | 41 | WordPress sites | WP-CLI as www-data (no `--allow-root`), DB access, global db wiring | wp: core version, siteurl, DB_HOST, failing WP-CLI, interactive WP-CLI |
 | 42 | idempotency | repeated runs give the same result; `my.cnf` kept | html: "Running the same command twice…" (weak: `ee shell` itself has no side effects), global: "An existing my.cnf is not overwritten" |
@@ -65,12 +65,12 @@ Coverage estimate: 42 of 47 inventory items (about 89%); the uncovered ones are 
 | `shell-validation.feature` | none | 12 |
 | `shell-html.feature` | `bh-shell-command-1.test` (html) | 21 |
 | `shell-php-command.feature` | `bh-shell-command-2.test` (php 8.4, `--with-db --local-db`) | 39 |
-| `shell-php-interactive.feature` | `bh-shell-command-3.test` (php) | 19 |
+| `shell-php-interactive.feature` | `bh-shell-command-3.test` (php) | 20 |
 | `shell-wp.feature` | `bh-shell-command-4.test` (wp, global db) | 9 |
 | `shell-global-services.feature` | `bh-shell-command-5.test` (php, `--with-db --cache`) | 13 |
-| **Total** | 5 sites | **113** |
+| **Total** | 5 sites | **114** |
 
-Tags: `@known-bug` 17, `@destructive` 5, `@le` 0, `@remote` 0 (nothing in `ee shell` needs public DNS or backups).
+Tags: `@known-bug` 18, `@destructive` 5, `@le` 0, `@remote` 0 (nothing in `ee shell` needs public DNS or backups).
 
 ## Known bugs exposed (issues.md `SHELL-1`…`SHELL-9`, core `CORE-2`)
 
@@ -84,7 +84,7 @@ Tags: `@known-bug` 17, `@destructive` 5, `@le` 0, `@remote` 0 (nothing in `ee sh
 - **SHELL-6** (Low): the interactive path builds its own `exec` without `-T`, so `--skip-tty` is ignored; from a terminal with redirected STDIN docker fails with "the input device is not a TTY".
 - **SHELL-7** (Cosmetic): help prints ` ## EXAMPLES`; the README lists `[--skip-tty]` as a command option (it's a global parameter); the "Could not find the site…" message has double spaces (`ee shell  <site-name>`).
 - **SHELL-8** (Low): the global-db `my.cnf` with the DB root password is written with mode 0644. Defence in depth: on current Docker `/var/lib/docker` is 0710 root:root, so other local users can't reach it by path.
-- **SHELL-9** (Medium): `check_user_available()` runs `docker-compose exec` with STDIN attached, which swallows piped input: `ee shell <site> --user=root < script.sh` runs nothing. Reproduced in a throwaway compose project.
+- **SHELL-9** (Medium): `check_user_available()` runs `docker-compose exec` with STDIN attached, which swallows piped input: `ee shell <site> --user=root < script.sh` runs nothing. Reproduced in a throwaway compose project. On Docker 28.0.4 (GitHub runner) the check for an unknown user swallows the input too; on 29.8.1 it doesn't.
 
 ## Running
 

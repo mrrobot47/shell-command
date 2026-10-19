@@ -84,6 +84,12 @@ Feature: Interactive ee shell on a php site
       """
       Warning: bh-nouser is not available in php, falling back to default user.
       """
+
+  # SHELL-9 (expected to fail until fixed): whether the failing user check swallows the piped input depends on the Docker version (it does on 28.0.4, not on 29.8.1).
+  @known-bug
+  Scenario: The fallback shell of an unknown --user still gets the piped input
+    When I run 'printf "whoami\n" | bin/ee shell bh-shell-command-3.test --user=bh-nouser'
+    Then the return code should be 0
     And STDOUT should be:
       """
       www-data
