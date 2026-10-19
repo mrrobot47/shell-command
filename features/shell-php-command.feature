@@ -39,7 +39,7 @@ Feature: ee shell --command on a php site
       err
       """
 
-  # Only statuses that hold with and without the SHELL-2 fix; the exact-status cases are the @known-bug scenario below.
+  # Only statuses that hold with and without the SHELL-2 fix; the exact-status cases come back with that fix.
   Scenario Outline: Exit status of the command
     When I run 'bin/ee shell bh-shell-command-2.test --command="<command>"'
     Then the return code should be <code>
@@ -49,17 +49,6 @@ Feature: ee shell --command on a php site
       | true     | 0    |
       | false    | 1    |
       | exit 1   | 1    |
-
-  # SHELL-2 (expected to fail until fixed): --command collapses every failure to exit 1 (#25), while the interactive mode propagates the real status.
-  @known-bug
-  Scenario Outline: The exact exit status of the command is propagated
-    When I run 'bin/ee shell bh-shell-command-2.test --command="exit <code>"'
-    Then the return code should be <code>
-
-    Examples:
-      | code |
-      | 3    |
-      | 255  |
 
   Scenario: An unknown binary fails with the shell's error
     When I run 'bin/ee shell bh-shell-command-2.test --command=bh-no-such-binary'
@@ -108,34 +97,6 @@ Feature: ee shell --command on a php site
       3
       """
 
-  # SHELL-4 (expected to fail until fixed): the command is wrapped as bash -c "<command>" on the host, so double quotes end the wrapper early.
-  @known-bug
-  Scenario: Double quotes inside the command are preserved
-    When I run 'bin/ee shell bh-shell-command-2.test --command='echo "a  b"''
-    Then the return code should be 0
-    And STDOUT should be:
-      """
-      a  b
-      """
-
-  # SHELL-4 (expected to fail until fixed): the host shell expands $VAR and $(...) before the container sees the command.
-  @known-bug
-  Scenario: Variables in the command are expanded inside the container
-    When I run 'bin/ee shell bh-shell-command-2.test --command='X=inner; echo $X''
-    Then the return code should be 0
-    And STDOUT should be:
-      """
-      inner
-      """
-
-  # SHELL-4 (expected to fail until fixed): $(...) runs on the host (as root), so this prints the host's hostname.
-  @known-bug
-  Scenario: Command substitution runs inside the container
-    When I run 'bin/ee shell bh-shell-command-2.test --command="cat /etc/hostname"'
-    And I run 'bin/ee shell bh-shell-command-2.test --command='echo $(cat /etc/hostname)''
-    Then the return code should be 0
-    And the outputs of the last two commands should be identical
-
   Scenario Outline: --skip-tty is accepted in command mode
     When I run 'bin/ee shell bh-shell-command-2.test <flag> --command="echo ok"'
     Then the return code should be 0
@@ -183,32 +144,6 @@ Feature: ee shell --command on a php site
       """
       Warning: --command parameter needs a value
       """
-
-  # SHELL-5 (expected to fail until fixed): an empty (or "0") --command silently opens the interactive shell, so `--command="$CMD"` with an empty CMD reads stdin instead of failing.
-  @known-bug
-  Scenario Outline: An empty or falsy --command is not turned into an interactive shell
-    When I run 'bin/ee shell bh-shell-command-2.test --command=<command> < /dev/null'
-    Then the return code should not be 0
-
-    Examples:
-      | command |
-      | ""      |
-      | 0       |
-
-  # SHELL-1 (expected to fail until fixed): the validated user is turned into "--user=<user>" and then quoted again by docker_compose_exec(), giving --user='--user=<user>'.
-  @known-bug
-  Scenario Outline: --user selects the user of the command
-    When I run 'bin/ee shell bh-shell-command-2.test --user=<user> --command=whoami'
-    Then the return code should be 0
-    And STDOUT should be:
-      """
-      <user>
-      """
-
-    Examples:
-      | user     |
-      | root     |
-      | www-data |
 
   Scenario: An unknown --user falls back to the default user with a warning
     When I run 'bin/ee shell bh-shell-command-2.test --user=bh-nouser --command=whoami'

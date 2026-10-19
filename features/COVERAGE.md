@@ -9,13 +9,13 @@ Suite for `ee shell` (package `easyengine/shell-command`, `src/Shell_Command.php
 | # | Item | Behaviour in the code | Covered by |
 |---|---|---|---|
 | 1 | help / synopsis | docblock synopsis, `--service` default `php` | validation: "The command is registered…" |
-| 2 | help EXAMPLES heading | docblock has ` ## EXAMPLES` (extra space) so help prints the raw heading | validation: "Help renders the EXAMPLES heading" `@known-bug` SHELL-7 |
+| 2 | help EXAMPLES heading | docblock has ` ## EXAMPLES` (extra space) so help prints the raw heading | not covered yet: SHELL-7 (its scenario comes back with the fix) |
 | 3 | `<site-name>` omitted, outside a site dir | `auto_site_name()` errors "Could not find the site…" | validation: "No site name outside a site directory", "…in interactive mode…" |
 | 4 | `<site-name>` unknown | same error (not "does not exist"), no Docker call | validation: "Unknown site name" |
 | 5 | `<site-name>` omitted, inside the site dir | detected from `pwd` (site root and symlinked `app/htdocs`) | html: "detected from the site root directory", "…(symlinked) web root…", "…in interactive mode" |
 | 6 | wrong `<site-name>` inside a site dir | "X is not a valid site-name. Did you mean `ee shell  <site>`?" | html: "A wrong site name inside a site directory…" |
 | 7 | trailing slash | stripped | html: "A trailing slash…" |
-| 8 | `http(s)://` prefix | accepted by `auto_site_name()` but raw arg reaches `get_site_info()` | html: "A site URL with a scheme…" `@known-bug` SHELL-3 |
+| 8 | `http(s)://` prefix | accepted by `auto_site_name()` but raw arg reaches `get_site_info()` | not covered yet: SHELL-3 (its scenario comes back with the fix) |
 | 9 | disabled site | `get_site_info()` refuses, both modes | html: "A disabled site is refused", "…in interactive mode too" |
 | 10 | too many positionals / unknown flags / typos | core synopsis validation, suggestions | validation: "Unknown parameters…" (4 examples), "Too many positional arguments" |
 | 11 | `--service` default `php` | php container, `www-data`, `/var/www/htdocs` | php-command: "The default service is php…", interactive: "Commands piped to STDIN…" |
@@ -31,22 +31,22 @@ Suite for `ee shell` (package `easyengine/shell-command`, `src/Shell_Command.php
 | 21 | `global-cron` is not a global target | falls into the site branch | validation: "global-cron is not a global shell target…", html outline |
 | 22 | stopped global container | "global-redis service container is not running." (both modes) | global: "A stopped global service is reported…" `@destructive` |
 | 23 | global-db `my.cnf` | written once from `Option::get(GLOBAL_DB)`, enables password-less `mariadb` (both modes; the global-db root has no unix_socket auth, checked in a throwaway container, so the query really proves the file), not overwritten | global: "…creates my.cnf…", "An existing my.cnf is not overwritten", "Interactive global-db shell…" (all `@destructive`) |
-| 24 | global-db `my.cnf` mode | root password written 0644 | global: "The generated my.cnf is only readable by root" `@known-bug` `@destructive` SHELL-8 |
+| 24 | global-db `my.cnf` mode | root password written 0644 | not covered yet: SHELL-8 (its scenario comes back with the fix) |
 | 25 | shell binary | `sh` for mailhog (no bash in image), `bash` otherwise | wp: mailhog scenario (command and interactive) |
 | 26 | `--command` output | STDOUT replayed, STDERR via `error_log()` | php-command: "STDOUT of the command is printed", "STDERR is kept separate…", "Multi-line output…" |
 | 27 | `--command` exit status | any failure → exit 1 (#25) | php-command: outline (true/false/exit 1), "An unknown binary…", "STDERR is kept separate…" and global "A failing command…" (non-zero only, so a SHELL-2 fix doesn't break them), wp: failing WP-CLI |
-| 28 | `--command` exact status | collapsed to 1 | php-command: "The exact exit status…" (3, 255) `@known-bug` SHELL-2 |
-| 29 | `--command` quoting | wrapped as `bash -c "<cmd>"` by the host shell | php-command: shell syntax outline (works), "Double quotes…", "Variables…" and "Command substitution runs inside the container" `@known-bug` SHELL-4 |
+| 28 | `--command` exact status | collapsed to 1 | not covered yet: SHELL-2 (its scenario comes back with the fix) |
+| 29 | `--command` quoting | wrapped as `bash -c "<cmd>"` by the host shell | php-command: shell syntax outline (works); double quotes, variables and command substitution not covered yet: SHELL-4 (their scenarios come back with the fix) |
 | 30 | `--command` STDIN | forwarded (`exec -i`) | php-command: "STDIN is forwarded to the command" (with/without `--skip-tty`) |
 | 31 | `--command` TTY | output captured, never a TTY, even from a terminal | php-command: "Command mode never allocates a TTY…", "…even when ee runs in a terminal" |
-| 32 | `--command` without value / empty / `0` | warning then interactive / silently interactive | php-command: "--command without a value warns" (only the warning is pinned; the interactive fallback is part of SHELL-5), "An empty or falsy --command…" (`""`, `0`) `@known-bug` SHELL-5 |
+| 32 | `--command` without value / empty / `0` | warning then interactive / silently interactive | php-command: "--command without a value warns" (only the warning is pinned; the interactive fallback is part of SHELL-5); empty or falsy `--command` (`""`, `0`) not covered yet: SHELL-5 (its scenario comes back with the fix) |
 | 33 | `--skip-tty` | adds `-T` in `docker_compose_exec()` only | accepted and harmless only: validation, php-command outline, "--skip-tty does not hide a failure", interactive "--skip-tty keeps working with piped input". Whether `-T` is really added isn't observable, because docker-compose v2 disables the TTY whenever its stdout is a pipe (always the case under `EE::exec`) |
-| 34 | `--skip-tty` in interactive mode | ignored (no `-T`) | interactive: "From a terminal with STDIN redirected…" (control), "--skip-tty makes the interactive shell work…" `@known-bug` SHELL-6 |
+| 34 | `--skip-tty` in interactive mode | ignored (no `-T`) | interactive: "From a terminal with STDIN redirected…" (control); `--skip-tty` there not covered yet: SHELL-6 (its scenario comes back with the fix) |
 | 35 | interactive mode | `proc_open` with ee's own fds, status via `proc_close()` | interactive: piped commands, EOF, exit status outline (0/3/42/255), last command status, 127, STDOUT/STDERR separation, session state |
 | 36 | interactive TTY | allocated when ee runs in a terminal | interactive: "From a terminal the shell gets a TTY…" |
-| 37 | `--user` valid, command mode | `--user='--user=<u>'` double wrap | php-command outline (root, www-data), global: "--user on a global service in command mode" `@known-bug` SHELL-1 |
-| 38 | `--user` valid, interactive | works, but the user check swallows piped STDIN | interactive outline (root, www-data), global: "--user on a global service in interactive mode" `@known-bug` SHELL-9 |
-| 39 | `--user` unknown | warning, falls back to the default user | php-command, interactive, global ("…falls back…"); the interactive fallback's piped input: "The fallback shell of an unknown --user…" `@known-bug` SHELL-9 (Docker-version dependent) |
+| 37 | `--user` valid, command mode | `--user='--user=<u>'` double wrap | not covered yet: SHELL-1 (its scenarios, php-command outline for root and www-data and the global service one, come back with the fix) |
+| 38 | `--user` valid, interactive | works, but the user check swallows piped STDIN | not covered yet: SHELL-9 (its scenarios, interactive outline for root and www-data and the global service one, come back with the fix) |
+| 39 | `--user` unknown | warning, falls back to the default user | php-command, interactive, global ("…falls back…"); the interactive fallback's piped input not covered yet: SHELL-9, Docker-version dependent (its scenario comes back with the fix) |
 | 40 | `--user` without value | warning, default user | php-command: "--user without a value…" |
 | 41 | WordPress sites | WP-CLI as www-data (no `--allow-root`), DB access, global db wiring | wp: core version, siteurl, DB_HOST, failing WP-CLI, interactive WP-CLI |
 | 42 | idempotency | repeated runs give the same result; `my.cnf` kept | html: "Running the same command twice…" (weak: `ee shell` itself has no side effects), global: "An existing my.cnf is not overwritten" |
@@ -62,19 +62,19 @@ Coverage estimate: 42 of 47 inventory items (about 89%); the uncovered ones are 
 
 | Feature | Site(s) | Scenarios (outline rows counted) |
 |---|---|---|
-| `shell-validation.feature` | none | 12 |
-| `shell-html.feature` | `bh-shell-command-1.test` (html) | 21 |
-| `shell-php-command.feature` | `bh-shell-command-2.test` (php 8.4, `--with-db --local-db`) | 39 |
-| `shell-php-interactive.feature` | `bh-shell-command-3.test` (php) | 20 |
+| `shell-validation.feature` | none | 11 |
+| `shell-html.feature` | `bh-shell-command-1.test` (html) | 20 |
+| `shell-php-command.feature` | `bh-shell-command-2.test` (php 8.4, `--with-db --local-db`) | 30 |
+| `shell-php-interactive.feature` | `bh-shell-command-3.test` (php) | 16 |
 | `shell-wp.feature` | `bh-shell-command-4.test` (wp, global db) | 9 |
-| `shell-global-services.feature` | `bh-shell-command-5.test` (php, `--with-db --cache`) | 13 |
-| **Total** | 5 sites | **114** |
+| `shell-global-services.feature` | `bh-shell-command-5.test` (php, `--with-db --cache`) | 10 |
+| **Total** | 5 sites | **96** |
 
-Tags: `@known-bug` 18, `@destructive` 5, `@le` 0, `@remote` 0 (nothing in `ee shell` needs public DNS or backups).
+Tags: `@destructive` 4, `@le` 0, `@remote` 0 (nothing in `ee shell` needs public DNS or backups). CI runs the suite twice, with a terminal (main) and without one (notty). No `@known-bug` scenarios ship here: the 18 scenario rows written for open bugs (SHELL-1 to SHELL-9) are held back until their fixes land and then return as regular scenarios.
 
-## Known bugs exposed (issues.md `SHELL-1`…`SHELL-9`, core `CORE-2`)
+## Known bugs (issues.md `SHELL-1`…`SHELL-9`, core `CORE-2`; scenarios held back until fixed)
 
-`@known-bug` scenarios assert the fixed behaviour, so they fail until the bug is fixed.
+Their scenarios assert the fixed behaviour and return with the fixes.
 
 - **SHELL-1** (Medium): in `--command` mode a valid `--user` is turned into `--user=<u>` and then quoted again by `docker_compose_exec()`, producing `--user='--user=<u>'`, so docker fails with "unable to find user --user=root". Every `ee shell --user=<existing user> --command=…` fails. Reproduced with the same compose invocation in a throwaway project.
 - **SHELL-2** (Low): `--command` collapses every failure to exit 1, while the interactive mode propagates the real status.
@@ -92,5 +92,5 @@ Tags: `@known-bug` 18, `@destructive` 5, `@le` 0, `@remote` 0 (nothing in `ee sh
 - Interactive scenarios pipe input or use `< /dev/null`, and TTY cases run `script -qec … /dev/null` with piped input or `< /dev/null`, so none depends on Behat's own terminal. Plain `--command` runs still inherit Behat's STDIN (harmless: the commands don't read it). Help is run with `COLUMNS=200` so the synopsis doesn't wrap on a narrow terminal.
 - `@destructive` scenarios stop `services_global-redis_1` and delete/regenerate `/opt/easyengine/services/mariadb/conf/conf.d/my.cnf`. `@AfterScenario` undoes both even when a step fails: `Given the file … is restored after the scenario` snapshots my.cnf (content and mode, or its absence) and puts it back, and stopped containers are restarted; a failed restore fails the hook with what to fix by hand. Only a killed Behat process skips the hooks.
 - The custom compose scenario uses the local `easyengine/redis:v4.11.0` image; update the tag when `img-versions.json` moves. Its `docker-compose-custom.yml` is restored and the `bh-extra` container removed after the scenario (`Given the service … of site … is up` registers what it creates).
-- Estimated runtime: about 3.5 minutes of site creation (html ~15s, php ~25s twice, php with local db ~40s, wp ~60s), about 5 to 6 minutes for 113 scenarios (each `ee shell` call is 1 to 3s plus the site-list check in the Background), about 1 minute of site deletion: roughly 10 minutes in total. Excluding `@known-bug` and `@destructive`: `--tags='~@known-bug&&~@destructive'`.
+- Estimated runtime: about 3.5 minutes of site creation (html ~15s, php ~25s twice, php with local db ~40s, wp ~60s), about 5 to 6 minutes for the scenarios (each `ee shell` call is 1 to 3s plus the site-list check in the Background), about 1 minute of site deletion: roughly 10 minutes in total. Excluding `@destructive`: `--tags='~@destructive'`.
 - Validation done: `vendor/bin/behat --dry-run --strict` has no undefined or ambiguous steps (it exits 1 in dry-run because all steps are skipped, same as core's own suite), and `php -l` of `features/bootstrap/*.php` passes on php:7.4-cli and php:8.5-cli.

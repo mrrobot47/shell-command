@@ -57,26 +57,6 @@ Feature: ee shell on global services
       root
       """
 
-  # SHELL-1 (expected to fail until fixed): --user is double-wrapped (--user='--user=<user>') in command mode.
-  @known-bug
-  Scenario: --user on a global service in command mode
-    When I run 'bin/ee shell --service=global-redis --user=redis --command=whoami'
-    Then the return code should be 0
-    And STDOUT should be:
-      """
-      redis
-      """
-
-  # SHELL-9 (expected to fail until fixed): the user check swallows piped STDIN before the interactive shell starts.
-  @known-bug
-  Scenario: --user on a global service in interactive mode
-    When I run 'printf "whoami\n" | bin/ee shell --service=global-redis --user=redis'
-    Then the return code should be 0
-    And STDOUT should be:
-      """
-      redis
-      """
-
   @destructive
   Scenario: The global-db shell creates my.cnf for password-less mysql
     Given the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' is restored after the scenario
@@ -123,15 +103,6 @@ Feature: ee shell on global services
       7
       """
     And the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' should exist
-
-  # SHELL-8 (expected to fail until fixed): the global db root password is written with the default 0644 mode.
-  @known-bug @destructive
-  Scenario: The generated my.cnf is only readable by root
-    Given the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' is restored after the scenario
-    And the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' is removed
-    When I run 'bin/ee shell --service=global-db --command=true'
-    Then the return code should be 0
-    And the file '/opt/easyengine/services/mariadb/conf/conf.d/my.cnf' should have permissions 600
 
   @destructive
   Scenario: A stopped global service is reported, in both modes

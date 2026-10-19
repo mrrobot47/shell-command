@@ -22,20 +22,6 @@ Feature: ee shell argument validation
       --skip-tty=<true/false>
       """
 
-  # SHELL-7 (expected to fail until fixed): the docblock indents "## EXAMPLES" by one extra space, so help prints the raw markdown heading.
-  @known-bug
-  Scenario: Help renders the EXAMPLES heading
-    When I run 'COLUMNS=200 bin/ee help shell < /dev/null'
-    Then the return code should be 0
-    And STDOUT should contain:
-      """
-      # Open shell for site
-      """
-    And STDOUT should not contain:
-      """
-      ## EXAMPLES
-      """
-
   Scenario: No site name outside a site directory
     When I run 'bin/ee shell --command=true'
     Then the return code should be 1

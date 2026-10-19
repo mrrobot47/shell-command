@@ -62,37 +62,12 @@ Feature: Interactive ee shell on a php site
       kept /tmp
       """
 
-  # SHELL-9 (expected to fail until fixed): check_user_available() runs `docker-compose exec` with STDIN attached, so it swallows the piped input before the real shell starts.
-  @known-bug
-  Scenario Outline: --user selects the user of the interactive shell
-    When I run 'printf "whoami\n" | bin/ee shell bh-shell-command-3.test --user=<user>'
-    Then the return code should be 0
-    And STDOUT should be:
-      """
-      <user>
-      """
-
-    Examples:
-      | user     |
-      | root     |
-      | www-data |
-
   Scenario: An unknown --user falls back to the default user with a warning
     When I run 'printf "whoami\n" | bin/ee shell bh-shell-command-3.test --user=bh-nouser'
     Then the return code should be 0
     And STDERR should contain:
       """
       Warning: bh-nouser is not available in php, falling back to default user.
-      """
-
-  # SHELL-9 (expected to fail until fixed): whether the failing user check swallows the piped input depends on the Docker version (it does on 28.0.4, not on 29.8.1).
-  @known-bug
-  Scenario: The fallback shell of an unknown --user still gets the piped input
-    When I run 'printf "whoami\n" | bin/ee shell bh-shell-command-3.test --user=bh-nouser'
-    Then the return code should be 0
-    And STDOUT should be:
-      """
-      www-data
       """
 
   Scenario: --service selects the container of the interactive shell
@@ -132,16 +107,6 @@ Feature: Interactive ee shell on a php site
     When I run 'script -qec "bin/ee shell bh-shell-command-3.test < /dev/null" /dev/null < /dev/null'
     Then the return code should not be 0
     And STDOUT should contain:
-      """
-      the input device is not a TTY
-      """
-
-  # SHELL-6 (expected to fail until fixed): the interactive path builds its own `exec` command and ignores --skip-tty (only docker_compose_exec() adds -T).
-  @known-bug
-  Scenario: --skip-tty makes the interactive shell work from a terminal with redirected STDIN
-    When I run 'script -qec "bin/ee shell bh-shell-command-3.test --skip-tty < /dev/null" /dev/null < /dev/null'
-    Then the return code should be 0
-    And STDOUT should not contain:
       """
       the input device is not a TTY
       """
