@@ -21,7 +21,7 @@ Feature: ee shell argument validation
       --skip-tty=<true/false>
       """
 
-  # SHELL-7 (proposed): the docblock indents "## EXAMPLES" by one extra space, so help prints the raw markdown heading.
+  # SHELL-7 (expected to fail until fixed): the docblock indents "## EXAMPLES" by one extra space, so help prints the raw markdown heading.
   @known-bug
   Scenario: Help renders the EXAMPLES heading
     When I run 'bin/ee help shell'

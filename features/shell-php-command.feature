@@ -50,7 +50,7 @@ Feature: ee shell --command on a php site
       | exit 2   | 1    |
       | exit 255 | 1    |
 
-  # SHELL-2 (proposed): --command collapses every failure to exit 1 (#25), while the interactive mode propagates the real status.
+  # SHELL-2 (expected to fail until fixed): --command collapses every failure to exit 1 (#25), while the interactive mode propagates the real status.
   @known-bug
   Scenario: The exact exit status of the command is propagated
     When I run 'bin/ee shell bh-shell-command-2.test --command="exit 3"'
@@ -103,7 +103,7 @@ Feature: ee shell --command on a php site
       3
       """
 
-  # SHELL-4 (proposed): the command is wrapped as bash -c "<command>" on the host, so double quotes end the wrapper early.
+  # SHELL-4 (expected to fail until fixed): the command is wrapped as bash -c "<command>" on the host, so double quotes end the wrapper early.
   @known-bug
   Scenario: Double quotes inside the command are preserved
     When I run 'bin/ee shell bh-shell-command-2.test --command='echo "a  b"''
@@ -113,7 +113,7 @@ Feature: ee shell --command on a php site
       a  b
       """
 
-  # SHELL-4 (proposed): the host shell expands $VAR and $(...) before the container sees the command.
+  # SHELL-4 (expected to fail until fixed): the host shell expands $VAR and $(...) before the container sees the command.
   @known-bug
   Scenario: Variables in the command are expanded inside the container
     When I run 'bin/ee shell bh-shell-command-2.test --command='X=inner; echo $X''
@@ -122,6 +122,14 @@ Feature: ee shell --command on a php site
       """
       inner
       """
+
+  # SHELL-4 (expected to fail until fixed): $(...) runs on the host (as root), so this prints the host's hostname.
+  @known-bug
+  Scenario: Command substitution runs inside the container
+    When I run 'bin/ee shell bh-shell-command-2.test --command="cat /etc/hostname"'
+    And I run 'bin/ee shell bh-shell-command-2.test --command='echo $(cat /etc/hostname)''
+    Then the return code should be 0
+    And the outputs of the last two commands should be identical
 
   Scenario Outline: --skip-tty is accepted in command mode
     When I run 'bin/ee shell bh-shell-command-2.test <flag> --command="echo ok"'
@@ -153,7 +161,7 @@ Feature: ee shell --command on a php site
       """
 
   Scenario: Command mode captures output even when ee runs in a terminal
-    When I run 'script -qec "bin/ee shell bh-shell-command-2.test --command=tty" /dev/null'
+    When I run 'script -qec "bin/ee shell bh-shell-command-2.test --command=tty" /dev/null < /dev/null'
     Then the return code should be 1
     And STDOUT should contain:
       """
@@ -172,13 +180,18 @@ Feature: ee shell --command on a php site
       fell-back
       """
 
-  # SHELL-5 (proposed): an empty --command silently opens the interactive shell, so `--command="$CMD"` with an empty CMD reads stdin instead of failing.
+  # SHELL-5 (expected to fail until fixed): an empty (or "0") --command silently opens the interactive shell, so `--command="$CMD"` with an empty CMD reads stdin instead of failing.
   @known-bug
-  Scenario: An empty --command is rejected
-    When I run 'bin/ee shell bh-shell-command-2.test --command="" < /dev/null'
+  Scenario Outline: An empty or falsy --command is not turned into an interactive shell
+    When I run 'bin/ee shell bh-shell-command-2.test --command=<command> < /dev/null'
     Then the return code should not be 0
 
-  # SHELL-1 (proposed): the validated user is turned into "--user=<user>" and then quoted again by docker_compose_exec(), giving --user='--user=<user>'.
+    Examples:
+      | command |
+      | ""      |
+      | 0       |
+
+  # SHELL-1 (expected to fail until fixed): the validated user is turned into "--user=<user>" and then quoted again by docker_compose_exec(), giving --user='--user=<user>'.
   @known-bug
   Scenario Outline: --user selects the user of the command
     When I run 'bin/ee shell bh-shell-command-2.test --user=<user> --command=whoami'

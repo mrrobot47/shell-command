@@ -74,7 +74,7 @@ Feature: ee shell on an html site
       /var/www/htdocs
       """
 
-  # SHELL-3 (proposed): auto_site_name() accepts http(s):// but returns the raw arg, so get_site_info() looks up "http://<site>".
+  # SHELL-3 (expected to fail until fixed): auto_site_name() accepts http(s):// but returns the raw arg, so get_site_info() looks up "http://<site>".
   @known-bug
   Scenario: A site URL with a scheme is accepted
     When I run 'bin/ee shell http://bh-shell-command-1.test --command=pwd'

@@ -62,7 +62,7 @@ Feature: Interactive ee shell on a php site
       kept /tmp
       """
 
-  # SHELL-9 (proposed): check_user_available() runs `docker-compose exec` with STDIN attached, so it swallows the piped input before the real shell starts.
+  # SHELL-9 (expected to fail until fixed): check_user_available() runs `docker-compose exec` with STDIN attached, so it swallows the piped input before the real shell starts.
   @known-bug
   Scenario Outline: --user selects the user of the interactive shell
     When I run 'printf "whoami\n" | bin/ee shell bh-shell-command-3.test --user=<user>'
@@ -123,17 +123,17 @@ Feature: Interactive ee shell on a php site
       """
 
   Scenario: From a terminal with STDIN redirected, docker refuses the TTY
-    When I run 'script -qec "bin/ee shell bh-shell-command-3.test < /dev/null" /dev/null'
+    When I run 'script -qec "bin/ee shell bh-shell-command-3.test < /dev/null" /dev/null < /dev/null'
     Then the return code should not be 0
     And STDOUT should contain:
       """
       the input device is not a TTY
       """
 
-  # SHELL-6 (proposed): the interactive path builds its own `exec` command and ignores --skip-tty (only docker_compose_exec() adds -T).
+  # SHELL-6 (expected to fail until fixed): the interactive path builds its own `exec` command and ignores --skip-tty (only docker_compose_exec() adds -T).
   @known-bug
   Scenario: --skip-tty makes the interactive shell work from a terminal with redirected STDIN
-    When I run 'script -qec "bin/ee shell bh-shell-command-3.test --skip-tty < /dev/null" /dev/null'
+    When I run 'script -qec "bin/ee shell bh-shell-command-3.test --skip-tty < /dev/null" /dev/null < /dev/null'
     Then the return code should be 0
     And STDOUT should not contain:
       """
