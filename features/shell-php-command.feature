@@ -39,7 +39,7 @@ Feature: ee shell --command on a php site
       err
       """
 
-  # Only statuses that hold with and without the SHELL-2 fix; the exact-status cases come back with that fix.
+  # Only statuses that hold with and without a fix for the collapsed exit status; the exact-status cases come back with that fix.
   Scenario Outline: Exit status of the command
     When I run 'bin/ee shell bh-shell-command-2.test --command="<command>"'
     Then the return code should be <code>
@@ -50,7 +50,7 @@ Feature: ee shell --command on a php site
       | false    | 1    |
       | exit 1   | 1    |
 
-  # Non-zero only: bash exits 127, which SHELL-2 collapses to 1.
+  # Non-zero only: bash exits 127, which --command currently collapses to 1.
   Scenario: An unknown binary fails with the shell's error
     When I run 'bin/ee shell bh-shell-command-2.test --command=bh-no-such-binary'
     Then the return code should not be 0
@@ -138,7 +138,7 @@ Feature: ee shell --command on a php site
       not a tty
       """
 
-  # Today it then falls back to the interactive shell (part of SHELL-5), so only the warning is pinned here.
+  # Today it then falls back to the interactive shell (a known bug), so only the warning is pinned here.
   Scenario: --command without a value warns
     When I run 'bin/ee shell bh-shell-command-2.test --command < /dev/null'
     Then STDERR should contain:
