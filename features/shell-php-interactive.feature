@@ -106,7 +106,5 @@ Feature: Interactive ee shell on a php site
   Scenario: From a terminal with STDIN redirected, docker refuses the TTY
     When I run 'script -qec "bin/ee shell bh-shell-command-3.test < /dev/null" /dev/null < /dev/null'
     Then the return code should not be 0
-    And STDOUT should contain:
-      """
-      the input device is not a TTY
-      """
+    # docker-compose 2.27.0 says "the input device is not a TTY"; 5.x, which EE 4.14.0 leaves in place, says "stdin is not a terminal".
+    And STDOUT should match '/the input device is not a TTY|stdin is not a terminal/'
